@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- P-07: zoom must stay available for low-vision users (no user-scalable=no) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="2048 Open Edition：在线免费玩 2048，无广告、无账号、打开即玩。" />
+    <meta name="theme-color" content="#faf8ef" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
+    <title>2048 Open Edition</title>
+    <!-- FR-11: prefs applied before first paint to avoid flash; external file (CSP-safe) -->
+    <script src="/boot.js"></script>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <noscript>
+      <p>
+        2048 Open Edition 需要 JavaScript 才能运行。规则：在 4×4 棋盘上滑动数字方块，相同数字合并相加，目标合成 2048。 /
+        This game requires JavaScript. Rules: slide tiles on a 4×4 board, merge equal numbers, reach 2048.
+      </p>
+    </noscript>
+
+    <a class="skip-link" href="#board" data-i18n="skipToBoard"></a>
+
+    <div class="container">
+      <header class="header">
+        <h1 class="title">2048 <span class="title-edition">Open Edition</span></h1>
+        <div class="scores">
+          <div class="score-box">
+            <div class="score-label" data-i18n="score"></div>
+            <div class="score-value" id="score" aria-live="off">0</div>
+          </div>
+          <div class="score-box best-box">
+            <div class="score-label" data-i18n="best"></div>
+            <div class="score-value" id="best" aria-live="off">0</div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button id="btn-new" class="button" type="button" data-i18n="newGame"></button>
+          <button id="btn-settings" class="icon-button" type="button" aria-label="settings" aria-haspopup="dialog">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.75"></circle>
+              <path d="M19.4 13.5a7.6 7.6 0 0 0 0-3l2-1.5-2-3.4-2.6 1a7.7 7.7 0 0 0-2.6-1.5L13.8 2h-3.6l-.4 3.1a7.7 7.7 0 0 0-2.6 1.5l-2.6-1-2 3.4 2 1.5a7.6 7.6 0 0 0 0 3l-2 1.5 2 3.4 2.6-1a7.7 7.7 0 0 0 2.6 1.5l.4 3.1h3.6l.4-3.1a7.7 7.7 0 0 0 2.6-1.5l2.6 1 2-3.4z" fill="none" stroke="currentColor" stroke-width="1.75"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="notices" id="notices" aria-live="polite">
+        <div class="notice notice-hint hidden" id="notice-intro" data-i18n="introHint"></div>
+        <div class="notice hidden" id="notice-restored" data-i18n="restored"></div>
+        <div class="notice notice-error hidden" id="notice-error">
+          <span data-i18n="errorBanner"></span>
+          <button type="button" class="button button-small" id="btn-refresh" data-i18n="refresh"></button>
+          <button type="button" class="button button-small" id="btn-copy-error" data-i18n="copyErrorCode"></button>
+        </div>
+        <div class="notice notice-readonly hidden" id="notice-readonly">
+          <span data-i18n="readOnlyBanner"></span>
+          <button type="button" class="button button-small" id="btn-takeover" data-i18n="takeOver"></button>
+        </div>
+        <div class="notice hidden" id="notice-update">
+          <span data-i18n="newVersion"></span>
+          <button type="button" class="button button-small" id="btn-update-refresh" data-i18n="refresh"></button>
+        </div>
+        <div class="notice hidden" id="notice-toast" role="status"></div>
+      </div>
+
+      <main class="game-area">
+        <!-- FR-12: the visual board is hidden from AT; a semantic role=table
+             twin (#board-sr) carries the accessible structure. Cells are not
+             focusable (arrow keys drive the game). -->
+        <div class="board-outer">
+          <div class="board" id="board" aria-hidden="true">
+            <div class="board-cells">
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+            </div>
+            <div class="board-tiles" id="board-tiles"></div>
+          </div>
+        </div>
+        <div class="visually-hidden" id="board-sr" role="table" aria-label="2048"></div>
+
+        <div id="score-additions" class="score-additions" aria-hidden="true"></div>
+      </main>
+
+      <footer class="footer">
+        <p class="how-to" data-i18n="howToPlay"></p>
+        <p class="attribution" data-i18n="footer"></p>
+        <p class="footer-links">
+          <a href="#" id="link-privacy" data-i18n="privacyPolicy"></a>
+          <span class="version" id="app-version"></span>
+        </p>
+      </footer>
+    </div>
+
+    <!-- aria-live announcement region (FR-12) -->
+    <div class="visually-hidden" id="announcer" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Win / lose overlay (FR-07) -->
+    <div class="overlay hidden" id="overlay-end" role="dialog" aria-modal="true" aria-labelledby="end-title">
+      <div class="overlay-bg"></div>
+      <div class="overlay-panel end-panel">
+        <h2 class="end-title" id="end-title"></h2>
+        <p class="end-sub" id="end-sub"></p>
+        <div class="end-stats" id="end-stats"></div>
+        <div class="end-actions">
+          <button type="button" class="button" id="btn-keep-going" data-i18n="keepGoing"></button>
+          <button type="button" class="button" id="btn-try-again" data-i18n="tryAgain"></button>
+          <button type="button" class="button button-secondary" id="btn-share" data-i18n="share"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- New-game confirm (FR-06) -->
+    <div class="overlay hidden" id="overlay-confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <div class="overlay-bg"></div>
+      <div class="overlay-panel confirm-panel">
+        <h2 class="confirm-title" id="confirm-title" data-i18n="confirmTitle"></h2>
+        <p data-i18n="confirmBody"></p>
+        <div class="confirm-actions">
+          <button type="button" class="button" id="btn-keep-playing" data-i18n="keepPlaying"></button>
+          <button type="button" class="button button-danger" id="btn-confirm-new" data-i18n="startNewGame"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings (FR-11) -->
+    <div class="overlay hidden" id="overlay-settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="overlay-bg"></div>
+      <div class="overlay-panel settings-panel">
+        <h2 class="settings-title" id="settings-title" data-i18n="settings"></h2>
+        <div class="settings-scroll">
+          <section>
+            <h3 data-i18n="settingsGame"></h3>
+            <label class="setting-row">
+              <span data-i18n="sound"></span>
+              <input type="checkbox" id="set-sound" />
+            </label>
+            <label class="setting-row">
+              <span data-i18n="haptics"></span>
+              <input type="checkbox" id="set-haptics" />
+            </label>
+            <label class="setting-row">
+              <span data-i18n="motion"></span>
+              <select id="set-motion">
+                <option value="system" data-i18n="motionSystem"></option>
+                <option value="reduce" data-i18n="motionReduce"></option>
+                <option value="full" data-i18n="motionFull"></option>
+              </select>
+            </label>
+            <label class="setting-row">
+              <span data-i18n="shortcuts"></span>
+              <input type="checkbox" id="set-shortcuts" />
+            </label>
+          </section>
+          <section>
+            <h3 data-i18n="settingsA11y"></h3>
+            <label class="setting-row">
+              <span data-i18n="announce"></span>
+              <select id="set-announce">
+                <option value="concise" data-i18n="announceConcise"></option>
+                <option value="verbose" data-i18n="announceVerbose"></option>
+              </select>
+            </label>
+          </section>
+          <section>
+            <h3 data-i18n="settingsDisplay"></h3>
+            <label class="setting-row">
+              <span data-i18n="language"></span>
+              <select id="set-lang">
+                <option value="zh-CN">简体中文</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+          </section>
+          <section>
+            <h3 data-i18n="settingsData"></h3>
+            <button type="button" class="button button-secondary" id="btn-reset-best" data-i18n="resetBest"></button>
+            <button type="button" class="button button-secondary" id="btn-export-data" data-i18n="exportData"></button>
+            <button type="button" class="button button-danger" id="btn-delete-data" data-i18n="deleteData"></button>
+          </section>
+          <section>
+            <h3 data-i18n="settingsPrivacy"></h3>
+            <label class="setting-row">
+              <span data-i18n="analytics"></span>
+              <input type="checkbox" id="set-analytics" />
+            </label>
+          </section>
+          <section>
+            <h3 data-i18n="settingsAbout"></h3>
+            <p class="about-text" data-i18n="aboutText"></p>
+            <p class="about-meta">
+              <span data-i18n="license"></span> · <span data-i18n="version"></span>
+              <span id="settings-version"></span>
+            </p>
+          </section>
+        </div>
+        <div class="settings-actions">
+          <button type="button" class="button" id="btn-close-settings" data-i18n="cancel"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Board status dialog for screen readers (FR-12: press I) -->
+    <div class="overlay hidden" id="overlay-boardinfo" role="dialog" aria-modal="true" aria-labelledby="boardinfo-title">
+      <div class="overlay-bg"></div>
+      <div class="overlay-panel boardinfo-panel">
+        <h2 class="settings-title" id="boardinfo-title" data-i18n="boardInfo"></h2>
+        <p class="boardinfo-hint" data-i18n="boardInfoHint"></p>
+        <table class="boardinfo-table" id="boardinfo-table">
+          <tbody></tbody>
+        </table>
+        <div class="settings-actions">
+          <button type="button" class="button" id="btn-close-boardinfo" data-i18n="cancel"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generic confirm (reset best / delete data) -->
+    <div class="overlay hidden" id="overlay-generic-confirm" role="dialog" aria-modal="true" aria-labelledby="generic-confirm-title">
+      <div class="overlay-bg"></div>
+      <div class="overlay-panel confirm-panel">
+        <h2 class="confirm-title" id="generic-confirm-title"></h2>
+        <div class="confirm-actions">
+          <button type="button" class="button" id="btn-generic-cancel" data-i18n="cancel"></button>
+          <button type="button" class="button button-danger" id="btn-generic-confirm" data-i18n="confirm"></button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
