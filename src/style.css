@@ -77,7 +77,8 @@ body {
 }
 
 .container {
-  max-width: var(--container);
+  /* 500px board + horizontal padding (PRD §8.4: board stays a 500px square) */
+  max-width: calc(var(--container) + 32px);
   margin: 0 auto;
   padding: 16px 16px 24px;
 }
@@ -239,6 +240,7 @@ body {
 
 .board {
   position: relative;
+  flex-shrink: 0; /* never squeezed by the flex row (board must stay square) */
   width: calc(var(--pad) * 2 + var(--cell) * 4 + var(--gap) * 3);
   height: calc(var(--pad) * 2 + var(--cell) * 4 + var(--gap) * 3);
   background: var(--board);
